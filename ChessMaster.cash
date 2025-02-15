@@ -1,0 +1,98 @@
+pragma cashscript ^0.10.0;
+
+/*  --- ChessMaster Mutable NFT State ---
+    bytes8 turnCounter = 0x00
+    byte deadKing = 0x00
+*/
+
+contract ChessMaster(bytes chessMasterCategory01, bytes squareCategory01) {
+//////////////////////////////////////////////////////////////////////////////////////////
+//inputs: 
+//  0       ChessMaster         [NFT]       (from ChessMaster contract)
+//  1       userBCH             [BCH]       (from user)
+//  2-65    Squares             [NFT]       (from Squares contract)
+//outputs:
+//  0       ChessMaster         [NFT]       (to ChessMaster contract)
+//  1       userBCH             [BCH]       (to user)
+//  2-65    Squares             [NFT]       (to Squares contract)
+//////////////////////////////////////////////////////////////////////////////////////////
+    function reset() {   
+        require(this.activeInputIndex == 0);
+        require(tx.inputs.length == 66 && tx.outputs.length == 66);
+
+        //verify ChessMasterNFT
+        require(tx.inputs[0].tokenCategory == chessMasterCategory01);
+
+        //verify userBCH has no tokens
+        require(tx.inputs[1].tokenCategory == 0x);
+
+        //verify king is dead
+        bytes deadKing = tx.inputs[0].nftCommitment.split(8)[1];
+        require(deadKing == 0x01);
+
+        //require input2 to be a Square, forces every further input to be a Square
+        require(tx.inputs[2].tokenCategory == squareCategory01);
+
+        //recreate ChessMasterNFT
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);             // recreate ChessMasterNFT
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);                 // same category+capability
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount);                     // same tokenAmount
+        require(tx.outputs[0].value == 1000);                                               // return to base dust
+        require(tx.outputs[0].nftCommitment == bytes9(0));                                  // reset turn counter
+    
+        // Force change output back to user
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);
+        require(tx.outputs[1].tokenCategory == 0x);                 
+        require(tx.outputs[1].value >= 1000);
+
+        // verify output2 is a Square, forces every further output to be a Square
+        require(tx.outputs[2].lockingBytecode == tx.inputs[2].lockingBytecode); 
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //  Increments turn counter and checks if king was captured. Prevents new moves if 
+    //  king has been captured.
+    //
+    //inputs: 
+    //  0   userBCH                   [BCH]       (from user)   
+    //  1   PieceLogic                [NFT]       (from PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (from ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (from Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (from Squares contract)
+    //  N   DestinationSquare         [NFT]       (from Squares contract)
+    //outputs:
+    //  0   userBCH                   [BCH]       (to user)   
+    //  1   PieceLogic                [NFT]       (to PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (to ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (to Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (to Squares contract)
+    //  N   DestinationSquare         [NFT]       (to Squares contract)
+    //////////////////////////////////////////////////////////////////////////////////////////
+    function move() {   
+        require(this.activeInputIndex == 2);
+
+        //verify ChessMasterNFT
+        require(tx.inputs[2].tokenCategory == chessMasterCategory01);   //mutable ChessMaster category
+
+        //require next input to be Square
+        require(tx.inputs[3].tokenCategory == squareCategory01);   //mutable ChessMaster category
+
+        //recreate ChessMasterNFT
+        require(tx.outputs[2].lockingBytecode == tx.inputs[2].lockingBytecode);             // recreate ChessMasterNFT
+        require(tx.outputs[2].tokenCategory == tx.inputs[2].tokenCategory);                 // same category+capability
+        require(tx.outputs[2].tokenAmount == tx.inputs[2].tokenAmount);                     // same tokenAmount
+        require(tx.outputs[2].value == tx.inputs[2].value);                                 // same value
+        bytes8 turnCounter, bytes currentDeadKing = tx.inputs[2].nftCommitment.split(8);
+        require(currentDeadKing == 0x00);
+        int newTurnCounter = int(turnCounter) + 1;
+
+        //verify whether king was just captured
+        bool isKing = tx.inputs[tx.inputs.length - 1].nftCommitment.split(7)[1].split(1)[0] == 0x06;
+        byte deadKing = 0x00;
+        if (isKing) {
+          deadKing = 0x01;
+        }
+
+        require(tx.outputs[2].nftCommitment == bytes8(newTurnCounter) + deadKing);           // new turn counter
+    }
+}

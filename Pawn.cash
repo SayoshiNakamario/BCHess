@@ -1,0 +1,88 @@
+pragma cashscript ^0.10.0;
+
+/*  --- Piece Immutable NFT State ---
+    none
+*/
+
+contract Pawn() {
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //  Move a pawn.
+    //
+    //inputs: 
+    //  0   userBCH                   [BCH]       (from user)   
+    //  1   PieceLogic                [NFT]       (from PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (from ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (from Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (from Squares contract)
+    //  N   DestinationSquare         [NFT]       (from Squares contract)
+    //outputs:
+    //  0   userBCH                   [BCH]       (to user)   
+    //  1   PieceLogic                [NFT]       (to PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (to ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (to Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (to Squares contract)
+    //  N   DestinationSquare         [NFT]       (to Squares contract)
+    //////////////////////////////////////////////////////////////////////////////////////////
+    function move() {   
+        //recreate pieceLogic
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);             // recreate PieceLogic
+        require(tx.outputs[1].tokenCategory == tx.inputs[1].tokenCategory);                 // same tokenCategory 
+        require(tx.outputs[1].value == 1000);                                               // dust to exist
+
+        //get what color turn it is
+        int turnCounter = int(tx.inputs[2].nftCommitment);
+        int colorTurn = turnCounter % 2;
+
+        //verify source square is correct color
+        byte sourceTeam, byte pieceType = tx.inputs[3].nftCommitment.split(6)[1].split(2)[0].split(1);                // get color of source square
+        require(int(sourceTeam) == colorTurn);                                                   // verify color of square is moving
+
+        //verify a piece is on the source square
+        require(pieceType != 0x00);
+
+        //verify destination square is empty or has an enemy
+        bytes destinationTeam = tx.inputs[tx.inputs.length - 1].nftCommitment.split(6)[1].split(1)[0];
+        require(int(destinationTeam) != colorTurn);
+
+        //get current source XY
+        byte sourceXByte, byte sourceYByte = tx.inputs[3].nftCommitment.split(6)[0].split(2)[1].split(2);
+        int sourceX = int(sourceXByte);
+        int sourceY = int(sourceYByte);
+
+        //get current destination XY
+        byte destinationXByte, byte destinationYByte = tx.inputs[tx.inputs.length - 1].nftCommitment.split(6)[0].split(2)[1].split(2);
+        int destinationX = int(destinationXByte);
+        int destinationY = int(destinationYByte);
+
+        // Check if pawn is in starting position
+        bool isStartingPosition = (colorTurn == 0 && sourceY == 1) || (colorTurn == 1 && sourceY == 6);
+
+        // If destination square is empty (normal forward movement)
+        if (destinationTeam == 0x02) {
+            require(destinationX == sourceX);  // Must move straight
+            if (isStartingPosition) {
+                // Can move 1 or 2 squares forward from starting position
+                if (colorTurn == 0) {
+                    require(destinationY == sourceY + 1 || destinationY == sourceY + 2);
+                } else {
+                    require(destinationY == sourceY - 1 || destinationY == sourceY - 2);
+                }
+            } else {
+                // Can only move 1 square forward otherwise
+                if (colorTurn == 0) {
+                    require(destinationY == sourceY + 1);
+                } else {
+                    require(destinationY == sourceY - 1);
+                }
+            }
+        } else {
+            // Capturing move must be diagonal
+            require(destinationX == sourceX + 1 || destinationX == sourceX - 1);
+            if (colorTurn == 0) {
+                require(destinationY == sourceY + 1);
+            } else {
+                require(destinationY == sourceY - 1);
+            }
+        }
+    }
+}

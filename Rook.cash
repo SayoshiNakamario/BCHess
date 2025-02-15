@@ -1,0 +1,57 @@
+pragma cashscript ^0.10.0;
+
+/*  --- Piece Immutable NFT State ---
+    none
+*/
+
+contract Rook() {
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //  Move a rook.
+    //
+    //inputs: 
+    //  0   userBCH                   [BCH]       (from user)   
+    //  1   PieceLogic                [NFT]       (from PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (from ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (from Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (from Squares contract)
+    //  N   DestinationSquare         [NFT]       (from Squares contract)
+    //outputs:
+    //  0   userBCH                   [BCH]       (to user)   
+    //  1   PieceLogic                [NFT]       (to PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (to ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (to Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (to Squares contract)
+    //  N   DestinationSquare         [NFT]       (to Squares contract)
+    //////////////////////////////////////////////////////////////////////////////////////////
+    function move() {   
+        //recreate pieceLogic
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);             // recreate PieceLogic
+        require(tx.outputs[1].tokenCategory == tx.inputs[1].tokenCategory);                 // same tokenCategory 
+        require(tx.outputs[1].value == 1000);                                               // dust to exist
+
+        //get what color turn it is
+        int turnCounter = int(tx.inputs[2].nftCommitment);
+        int colorTurn = turnCounter % 2;
+
+        //get current source XY
+        byte sourceXByte, byte sourceYByte = tx.inputs[3].nftCommitment.split(6)[0].split(2)[1].split(2);
+        int sourceX = int(sourceXByte);
+        int sourceY = int(sourceYByte);
+
+        //get current destination XY
+        byte destinationXByte, byte destinationYByte = tx.inputs[tx.inputs.length - 1].nftCommitment.split(6)[0].split(2)[1].split(2);
+        int destinationX = int(destinationXByte);
+        int destinationY = int(destinationYByte);
+
+        //verify not moving onto own team
+        bytes destinationTeam = tx.inputs[tx.inputs.length - 1].nftCommitment.split(6)[1].split(1)[0];
+        require(int(destinationTeam) != colorTurn);
+
+        // Rook can only move horizontally or vertically
+        // This means either X must be the same (vertical movement) or Y must be the same (horizontal movement)
+        require(
+            (sourceX == destinationX && sourceY != destinationY) ||  // Vertical movement
+            (sourceY == destinationY && sourceX != destinationX)     // Horizontal movement
+        );
+    }
+}

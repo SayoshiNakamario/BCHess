@@ -1,0 +1,144 @@
+pragma cashscript ^0.10.0;
+
+/*  --- Squares Mutable NFT State ---
+    byte startingTeam = 0x00        
+    byte startingPiece = 0x00
+    bytes2 x = 0x00
+    bytes2 y = 0x00
+    byte team = 0x00            // 0x00 white, 0x01 black, 0x02 empty        
+    byte pieceType = 0x00       // 0x00 none, 0x01 pawn, 0x02 knight, 0x03 bishop, 0x04 rook, 0x05 queen, 0x06 king
+*/
+
+contract Squares(bytes chessMasterCategory01, bytes squareCategory01, bytes pieceCategory00) {
+//////////////////////////////////////////////////////////////////////////////////////////
+//  Reset all squares to new game state.
+//
+//inputs: 
+//  0       ChessMaster         [NFT]       (from ChessMaster contract)
+//  1       userBCH             [BCH]       (from user)
+//  2-65    Squares             [NFT]       (from Squares contract)
+//outputs:
+//  0       ChessMaster         [NFT]       (to ChessMaster contract)
+//  1       userBCH             [BCH]       (to user)
+//  2-65    Squares             [NFT]       (to Squares contract)
+//////////////////////////////////////////////////////////////////////////////////////////
+    function reset() {   
+        //verify ChessMasterNFT
+        require(tx.inputs[0].tokenCategory == chessMasterCategory01);
+
+        //require next input is a valid Square utxo
+        int nextIndex = this.activeInputIndex + 1;
+
+        if (tx.inputs.length > nextIndex) {
+            require(tx.inputs[nextIndex].tokenCategory == squareCategory01);
+        }
+        
+        //reset square to new game state
+        bytes teamPiece, bytes XY = tx.inputs[this.activeInputIndex].nftCommitment.split(6)[0].split(2);
+        require(tx.outputs[this.activeInputIndex].nftCommitment == teamPiece + XY + teamPiece); 
+
+        //recreate Square
+        require(tx.outputs[this.activeInputIndex].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode);             // recreate ChessMasterNFT
+        require(tx.outputs[this.activeInputIndex].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);                 // same category+capability
+        require(tx.outputs[this.activeInputIndex].value == tx.inputs[this.activeInputIndex].value);                                 // same value
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //  Move a piece, overwrites any existing piece on the destination square.
+    //
+    //inputs: 
+    //  0   userBCH                   [BCH]       (from user)   
+    //  1   PieceLogic                [NFT]       (from PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (from ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (from Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (from Squares contract)
+    //  N   DestinationSquare         [NFT]       (from Squares contract)
+    //outputs:
+    //  0   userBCH                   [BCH]       (to user)   
+    //  1   PieceLogic                [NFT]       (to PieceLogic contract)
+    //  2   ChessMaster               [NFT]       (to ChessMaster contract)
+    //  3   SourceSquare              [NFT]       (to Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (to Squares contract)
+    //  N   DestinationSquare         [NFT]       (to Squares contract)
+    //////////////////////////////////////////////////////////////////////////////////////////
+    function move() {   
+        //verify PieceLogic
+        require(tx.inputs[1].tokenCategory == pieceCategory00);   //mutable PieceLogic category
+
+        //verify ChessMaster
+        require(tx.inputs[2].tokenCategory == chessMasterCategory01);   //mutable ChessMaster category
+
+        //verify a valid Square is being used
+        require(tx.inputs[3].tokenCategory == squareCategory01);   //mutable Squares category
+
+        //recreate Square
+        require(tx.outputs[this.activeInputIndex].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode);             // recreate ChessMasterNFT
+        require(tx.outputs[this.activeInputIndex].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);                 // same category+capability
+        require(tx.outputs[this.activeInputIndex].value == tx.inputs[this.activeInputIndex].value);                                 // same value
+
+        //set sourceSquare (piece vacates it)
+        bytes sourceStats, bytes pieceStats = tx.inputs[3].nftCommitment.split(6);
+        bytes newSourceCommitment = sourceStats + 0x0200;
+        require(tx.outputs[3].nftCommitment == newSourceCommitment); 
+
+        //set destinationSquare (piece moves to it)
+        bytes sourceTeam, bytes pieceType = pieceStats.split(1);
+        bytes destinationStats = tx.inputs[tx.inputs.length - 1].nftCommitment.split(6)[0];
+        bytes newDestinationCommitment = destinationStats + sourceTeam + pieceType;
+        require(tx.outputs[tx.inputs.length - 1].nftCommitment == newDestinationCommitment); 
+
+        //change must go back to user
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode); 
+        require(tx.outputs[0].tokenCategory == 0x);                 
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //  Check if a square is empty. Used with non-knight pieces that move multiple squares
+    //  in a single move to verify they don't pass through other pieces.
+    //
+    //inputs: 
+    //  0   PieceNFT                  [NFT]       (from PieceLogic contract)
+    //  1   ChessMasterNFT            [NFT]       (from ChessMaster contract)
+    //  2   SourceSquare              [NFT]       (from Squares contract)
+    //  ?   CheckEmptySquare(s)       [NFT]       (from Squares contract)
+    //  3   DestinationSquare         [NFT]       (from Squares contract)
+    //  4   userBCH                   [BCH]       (from user)
+    //outputs:
+    //  0   PieceNFT                  [NFT]       (to PieceLogic contract)
+    //  1   ChessMasterNFT            [NFT]       (to ChessMaster contract)
+    //  2   SourceSquare              [NFT]       (to Squares contract)
+    //  3   DestinationSquare         [NFT]       (to Squares contract)
+    //  4   change {optional}         [BCH]       (to user)
+    //////////////////////////////////////////////////////////////////////////////////////////
+    function checkEmpty() {   
+        //recreate Square
+        require(tx.outputs[this.activeInputIndex].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode);             // recreate ChessMasterNFT
+        require(tx.outputs[this.activeInputIndex].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);                 // same category+capability
+        require(tx.outputs[this.activeInputIndex].value == tx.inputs[this.activeInputIndex].value);                                 // same value
+        require(tx.outputs[this.activeInputIndex].nftCommitment == tx.inputs[this.activeInputIndex].nftCommitment);                 // same value
+        
+        // Verify this tile is empty
+        bytes squarePiece = tx.inputs[this.activeInputIndex].nftCommitment.split(7)[1];
+        require(squarePiece == 0x00, "this tile must be empty");
+
+        // Get piece type from source square
+        bytes pieceType = tx.inputs[3].nftCommitment.split(7)[1];
+
+        if (pieceType != 0x03) { //knights do not need to check empty squares
+            // Get coordinates of this tile and neighbors
+            byte prevXByte, byte prevYByte = tx.inputs[this.activeInputIndex - 1].nftCommitment.split(6)[0].split(2)[1].split(2);
+            byte thisXByte, byte thisYByte = tx.inputs[this.activeInputIndex].nftCommitment.split(6)[0].split(2)[1].split(2);
+            byte nextXByte, byte nextYByte = tx.inputs[this.activeInputIndex + 1].nftCommitment.split(6)[0].split(2)[1].split(2);
+
+            // Calculate steps between squares
+            int stepToPrevX = int(thisXByte) - int(prevXByte);
+            int stepToPrevY = int(thisYByte) - int(prevYByte);
+            int stepToNextX = int(nextXByte) - int(thisXByte);
+            int stepToNextY = int(nextYByte) - int(thisYByte);
+
+            // Verify steps are one square and in same direction
+            require(abs(stepToPrevX) <= 1 && abs(stepToPrevY) <= 1, "Steps must be one square");
+            require(stepToPrevX == stepToNextX && stepToPrevY == stepToNextY, "Must maintain direction");
+        }
+    }
+}
