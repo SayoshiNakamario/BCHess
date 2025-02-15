@@ -12,7 +12,7 @@ Each square keeps a copy of:
 - its x/y coordinate (permanent)
 - its current color/piece occuping the square (can change)
   
-move() removes (color/piece) from the source square and puts it on the destination square, overwriting whatever is on it.
+move() removes (color/piece) from the source square and puts it on the destination square, checking that it isn't occupied by its own team already, and overwrites any enemy piece on it.
 
 checkEmpty() checks the square to verify it has no pieces currently on it. This is used to verify a piece that moves multiple squares (Queen/Rook/Bishop) aren't trying to pass through an occupied tile. 
 
