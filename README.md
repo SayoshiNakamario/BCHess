@@ -1,4 +1,4 @@
-# BCHess
+# ₿CHess
 Chess game state stored with moves validated by contracts on Bitcoin Cash. Allows resetting the game after a king has actually been captured, rather than on checkmate.
 
 ## ChessMaster
@@ -29,6 +29,11 @@ Each piece type (pawn/knight/bishop/rook/queen/king) has its own contract with l
 
 ## Game Reset 
 Resetting the game can only be performed after a King has been captured. 
+
+## Stalemates & Checks
+Checks are not accounted for, so a player can move their King into a threatened space which will cause them to lose if it gets captured. 
+
+Stalemates are also not accounted for, and can be resolved simply by moving the King into a threatened space to be captured. Alternatively, a draw() function could be added for when both players agree to a draw.
 
 ## Other
 Preview state, things are missing/not locked down but basic functionality is working so far. Does not currently have castling rule, but Piece contracts themselves are fairly small. Squares contract is maxed out in current design.
