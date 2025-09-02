@@ -1,4 +1,7 @@
 # ₿CHess
+**[Note]** *This is an early version that operated on a single board. The version demoed at BLISS '25 was updated in various ways, including Factory contracts to create more boards, locking down the game to two specific addresses, BCH betting, etc. Some other logic/functions were also changed, but this early version shows the general logic behind the design. Will release the updated version later.
+These contracts were also designed to fit into the pre-2025 VM limits.* 
+
 Chess game state stored with moves validated by contracts on Bitcoin Cash. Allows resetting the game after a king has actually been captured, rather than on checkmate.
 
 ## ChessMaster
